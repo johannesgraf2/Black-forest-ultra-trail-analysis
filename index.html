@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interaktive Analyse der Ergebnisse und Zwischenzeiten des Black Forest Ultra Trail 2026.">
+  <title>BFUTR 2026 · Race Analytics</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">BLACK FOREST ULTRA TRAIL · 2026</p>
+        <h1>Race Analytics</h1>
+        <p class="hero-text">Zwischenzeiten verstehen, Rennverläufe vergleichen und sehen, auf welchen Abschnitten Zeit gewonnen oder verloren wurde.</p>
+      </div>
+      <div class="hero-metrics" aria-label="Datensatz Übersicht">
+        <div><strong id="metricParticipants">–</strong><span>Teilnehmer</span></div>
+        <div><strong id="metricRaces">–</strong><span>Distanzen</span></div>
+        <div><strong id="metricSplits">–</strong><span>Messzeiten</span></div>
+      </div>
+    </header>
+
+    <main>
+      <section class="control-panel card" aria-label="Analyse auswählen">
+        <div class="control-topline">
+          <div>
+            <span class="section-kicker">Analyse</span>
+            <h2>Wen möchtest du ansehen?</h2>
+          </div>
+          <label class="race-filter">
+            <span>Distanz</span>
+            <select id="raceFilter" aria-label="Distanz filtern"></select>
+          </label>
+        </div>
+
+        <div class="mode-tabs" role="tablist" aria-label="Analysemodus">
+          <button id="singleTab" class="mode-tab active" type="button" role="tab" aria-selected="true">Einzelanalyse</button>
+          <button id="compareTab" class="mode-tab" type="button" role="tab" aria-selected="false">Zwei Personen vergleichen</button>
+        </div>
+
+        <div class="quick-area">
+          <span>Direktauswahl</span>
+          <div id="favoriteButtons" class="quick-buttons"></div>
+        </div>
+
+        <div id="pickerGrid" class="picker-grid single-mode">
+          <div class="picker-block">
+            <label for="personAInput">Person A</label>
+            <div class="person-picker" id="personAPicker">
+              <input id="personAInput" type="search" autocomplete="off" placeholder="Name oder Startnummer suchen …" aria-autocomplete="list" aria-expanded="false">
+              <div class="picker-results" role="listbox"></div>
+            </div>
+          </div>
+          <div class="picker-block compare-only" id="personBBlock">
+            <label for="personBInput">Person B</label>
+            <div class="person-picker" id="personBPicker">
+              <input id="personBInput" type="search" autocomplete="off" placeholder="Zweite Person suchen …" aria-autocomplete="list" aria-expanded="false">
+              <div class="picker-results" role="listbox"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="singleView" class="analysis-view"></section>
+      <section id="compareView" class="analysis-view hidden"></section>
+
+      <section class="method-card card">
+        <div>
+          <span class="section-kicker">Zur Einordnung</span>
+          <h2>So werden die Werte berechnet</h2>
+        </div>
+        <div class="method-grid">
+          <p><strong>Zielzeit</strong> kommt ausschließlich aus einer tatsächlich gemessenen Passage am Messpunkt „Ziel“. Datasport-Prognosen werden nicht als Ergebnis gewertet.</p>
+          <p><strong>Checkpoint-Ränge</strong> werden aus allen Personen mit einer echten Messung an diesem Punkt berechnet. Dadurch bleiben auch Läufer ohne Zielresultat bis zu ihrem letzten Messpunkt vergleichbar.</p>
+          <p><strong>Abschnitt vs. Median</strong> vergleicht die Abschnittszeit mit dem Median aller verfügbaren Zeiten derselben Distanz für genau diesen Abschnitt.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>BFUTR 2026 Race Analytics · statische GitHub-Pages-Auswertung</p>
+      <p id="dataNote"></p>
+    </footer>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
