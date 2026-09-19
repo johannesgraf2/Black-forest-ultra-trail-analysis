@@ -33,3 +33,14 @@ Repository → `Settings` → `Pages` → `Deploy from a branch` → `main` → 
 - Personen ohne Zielresultat bleiben bis zu ihrem letzten gültigen Messpunkt in Checkpoint-Vergleichen enthalten.
 - Top-10-%-Niveau entspricht der 10.-Perzentil-Zeit des jeweiligen Abschnitts.
 - Pacing-Konstanz: 100 minus zweimal die Standardabweichung der Abschnittsabweichungen vom Feldmedian, begrenzt auf 0–100.
+
+## Version 3 – zusätzliche Visualisierungen
+
+Die v3 ergänzt vier visuelle Analysebausteine:
+
+- kumulativer Zeitabstand zum Feldmedian, Top-10-%-Niveau oder zur schnellsten Referenz
+- Perzentil-Verlauf, im Vergleichsmodus auch als Zwei-Personen-Kurve
+- Abschnitts-Heatmap relativ zur gewählten Benchmark
+- Zielzeit-Histogramm mit Median, Top-10-%-Grenze und persönlicher Markierung
+
+Die Visualisierungen sind weiterhin vollständig statisch und benötigen keine externe Chart-Bibliothek.
