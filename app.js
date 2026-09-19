@@ -1,8 +1,10 @@
 (function(){
   const DATA=window.BFUTR_DATA;
   const participants=DATA.participants;
+  const analytics=window.BFUTR_ANALYTICS;
+  const groupLabel=()=>analytics.groupLabel();
   const byId=new Map(participants.map(p=>[p.id,p]));
-  const state={mode:'single',race:'ALL',a:null,b:null,benchmark:'median'};
+  const state={mode:'single',race:'ALL',a:null,b:null,benchmark:'median',group:'all'};
   const benchmarkDefs={
     median:{key:'medianSec',label:'Feldmedian'},
     top10:{key:'top10Sec',label:'Top 10 %'},
@@ -37,7 +39,7 @@
       if(!m[a]||!m[b])continue;
       const sec=m[b].sec-m[a].sec;
       if(sec<0)continue;
-      const bench=DATA.benchmarks[p.race]&&DATA.benchmarks[p.race].section[a+' → '+b];
+      const bench=analytics.raceStats(p.race).section[a+' → '+b];
       if(!bench)continue;
       rows.push({label:a+' → '+b,from:a,to:b,sec,bench,diffPctMedian:pct(sec,bench.medianSec)});
     }
@@ -56,11 +58,11 @@
 
   function profileStats(p){
     const pos=positionContext(p),last=lastSplit(p),cons=consistencyMetrics(p);
-    const posText=pos?('Top '+fmtPct(topPct(pos.rank,pos.field))+' · P'+percentile(pos.rank,pos.field).toFixed(1).replace('.',',')):'–';
+    const posText=pos?('Top '+fmtPct(topPct(pos.rank,pos.field))):'–';
     return [
       ['Zielzeit',p.officialFinisher?fmtTime(p.finalSec):'–'],
       ['Rang gesamt',p.officialFinisher?rankText(p.finishRankOverall,p.finishFieldOverall):'–'],
-      ['Einordnung'+(pos?' · '+pos.label:''),posText],
+      ['Einordnung'+(pos?' · '+pos.label:'')+' · Gesamt',posText],
       [p.gender==='Offen'?'Kategorie':p.gender,p.officialFinisher?rankText(p.finishRankGender,p.finishFieldGender):'–'],
       ['Letzter Messpunkt',last?(last.checkpoint+' · '+fmtTime(last.sec)):'–'],
       ['Pacing-Konstanz',cons.score==null?'–':cons.score+' / 100']
@@ -77,15 +79,15 @@
     const strongest=rows.reduce((a,b)=>a.diffPctMedian<b.diffPctMedian?a:b);
     const weakest=rows.reduce((a,b)=>a.diffPctMedian>b.diffPctMedian?a:b);
     const cons=consistencyMetrics(p);
-    const strengthText=(strongest.diffPctMedian<=0?Math.abs(strongest.diffPctMedian).toFixed(1).replace('.',',')+' % schneller':strongest.diffPctMedian.toFixed(1).replace('.',',')+' % langsamer')+' als Median';
-    const weakText=(weakest.diffPctMedian<=0?Math.abs(weakest.diffPctMedian).toFixed(1).replace('.',',')+' % schneller':weakest.diffPctMedian.toFixed(1).replace('.',',')+' % langsamer')+' als Median';
+    const strengthText=(strongest.diffPctMedian<=0?Math.abs(strongest.diffPctMedian).toFixed(1).replace('.',',')+' % schneller':strongest.diffPctMedian.toFixed(1).replace('.',',')+' % langsamer')+' als Median · '+groupLabel();
+    const weakText=(weakest.diffPctMedian<=0?Math.abs(weakest.diffPctMedian).toFixed(1).replace('.',',')+' % schneller':weakest.diffPctMedian.toFixed(1).replace('.',',')+' % langsamer')+' als Median · '+groupLabel();
     const score=cons.score==null?'–':cons.score;
     const sd=cons.sd==null?'–':cons.sd.toFixed(1).replace('.',',')+' Prozentpunkte Streuung';
-    return '<div class="insight-card card"><span class="section-kicker">Automatische Rennanalyse</span><div class="insight-grid"><div class="insight"><span class="label">Stärkster Abschnitt</span><strong>'+esc(strongest.label)+'</strong><small>'+esc(strengthText)+'</small></div><div class="insight"><span class="label">Schwächster Abschnitt</span><strong>'+esc(weakest.label)+'</strong><small>'+esc(weakText)+'</small></div><div class="insight"><span class="label">Pacing-Konstanz</span><div class="score-ring" style="--score:'+esc(score)+'"><b>'+esc(score)+'</b></div><small>'+esc(sd)+' · misst Gleichmäßigkeit, nicht absolute Geschwindigkeit.</small></div></div></div>';
+    return '<div class="insight-card card"><span class="section-kicker">Automatische Rennanalyse · '+esc(groupLabel())+'</span><div class="insight-grid"><div class="insight"><span class="label">Stärkster Abschnitt</span><strong>'+esc(strongest.label)+'</strong><small>'+esc(strengthText)+'</small></div><div class="insight"><span class="label">Schwächster Abschnitt</span><strong>'+esc(weakest.label)+'</strong><small>'+esc(weakText)+'</small></div><div class="insight"><span class="label">Pacing-Konstanz</span><div class="score-ring" style="--score:'+esc(score)+'"><b>'+esc(score)+'</b></div><small>'+esc(sd)+' · misst Gleichmäßigkeit, nicht absolute Geschwindigkeit.</small></div></div></div>';
   }
 
   function renderBenchmarkBars(p){
-    const def=benchmarkDefs[state.benchmark],rows=sectionRows(p).map(r=>{const ref=r.bench[def.key];return Object.assign({},r,{ref,diffPct:ref?pct(r.sec,ref):null,diffSec:ref?r.sec-ref:null});}).filter(r=>r.ref!=null);
+    const def=benchmarkDefs[state.benchmark],rows=sectionRows(p).map(r=>{const ref=r.bench[def.key];return Object.assign({},r,{ref,diffPct:ref?pct(r.sec,ref):null,diffSec:ref?r.sec-ref:null});}).filter(r=>r.ref!=null&&r.ref>0);
     if(!rows.length)return '<div class="empty-state">Noch nicht genug aufeinanderfolgende Messpunkte für diese Benchmark.</div>';
     const max=Math.max(10,...rows.map(r=>Math.abs(r.diffPct||0)));
     return '<div class="section-bars">'+rows.map(r=>{const width=Math.min(48,Math.abs(r.diffPct||0)/max*48);const cls=(r.diffPct||0)<=0?'faster':'slower';const pctText=(r.diffPct>0?'+':'')+r.diffPct.toFixed(1).replace('.',',')+' %';return '<div class="section-row"><div class="section-label">'+esc(r.label)+'</div><div class="bar-track"><div class="bar-fill '+cls+'" style="width:'+width+'%"></div></div><div class="section-value '+((r.diffPct||0)<=0?'positive':'negative')+'">'+pctText+'<br><span class="muted">'+fmtDelta(r.diffSec)+'</span></div></div>';}).join('')+'</div>';
@@ -115,7 +117,7 @@
     const rows=order.map(cp=>{
       const s=m[cp];if(!s)return '';
       let section='–',vs='–';
-      if(prev&&m[prev]){const sec=s.sec-m[prev].sec,bench=DATA.benchmarks[p.race]&&DATA.benchmarks[p.race].section[prev+' → '+cp];section=fmtTime(sec);if(bench&&bench.medianSec){const d=pct(sec,bench.medianSec);vs='<span class="'+(d<=0?'positive':'negative')+'">'+(d>0?'+':'')+d.toFixed(1).replace('.',',')+' %</span>';}}
+      if(prev&&m[prev]){const sec=s.sec-m[prev].sec,bench=analytics.raceStats(p.race).section[prev+' → '+cp];section=fmtTime(sec);if(bench&&bench.medianSec){const d=pct(sec,bench.medianSec);vs='<span class="'+(d<=0?'positive':'negative')+'">'+(d>0?'+':'')+d.toFixed(1).replace('.',',')+' %</span>';}}
       prev=cp;
       const tp=s.rankOverall?topPct(s.rankOverall,s.fieldOverall):null;
       const per=s.rankOverall?percentile(s.rankOverall,s.fieldOverall):null;
@@ -124,19 +126,19 @@
       if(change!=null){const cls=change>0?'gain':change<0?'loss':'';changeHtml='<span class="place-pill '+cls+'">'+(change>0?'+':'')+change+'</span>';}
       return '<tr><td><strong>'+esc(cp)+'</strong></td><td class="num">'+fmtTime(s.sec)+'</td><td class="num">'+section+'</td><td class="num">'+rankText(s.rankOverall,s.fieldOverall)+'</td><td class="num">'+fmtPct(tp)+'</td><td class="num">'+(per==null?'–':'P'+per.toFixed(1).replace('.',','))+'</td><td class="num">'+changeHtml+'</td><td class="num">'+vs+'</td></tr>';
     }).join('');
-    return '<div class="table-card card"><div class="table-head"><h3>Alle Zwischenzeiten</h3><p class="panel-sub">„Δ Plätze“ zeigt den Gewinn oder Verlust gegenüber dem vorherigen Checkpoint mit gültigem Rang.</p></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Messpunkt</th><th>Passage</th><th>Abschnitt</th><th>Rang gesamt</th><th>Top %</th><th>Perzentil</th><th>Δ Plätze</th><th>Abschnitt vs. Median</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    return '<div class="table-card card"><div class="table-head"><h3>Alle Zwischenzeiten</h3><p class="panel-sub">„Δ Plätze“ zeigt den Gewinn oder Verlust gegenüber dem vorherigen Checkpoint mit gültigem Rang.</p></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Messpunkt</th><th>Passage</th><th>Abschnitt</th><th>Rang gesamt</th><th>Top %</th><th>Perzentil</th><th>Δ Plätze</th><th>Abschnitt vs. Median · '+esc(groupLabel())+'</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
   }
 
   function renderSingle(){
     const root=$('#singleView'),p=byId.get(state.a);
     if(!p){root.innerHTML='<div class="card empty-state">Wähle eine Person aus, um die Analyse zu öffnen.</div>';return;}
     const def=benchmarkDefs[state.benchmark];
-    root.innerHTML=renderProfileHeader(p)+renderInsights(p)+'<div class="grid-2"><div class="panel card"><h3>Perzentil im Rennverlauf</h3><p class="panel-sub">Je höher, desto weiter vorne im Feld. P90 entspricht ungefähr Top 10 %.</p><div class="chart-scroll"><div class="chart-host">'+renderPercentileChart(p)+'</div></div></div><div class="panel card"><div class="panel-head-row"><div><h3>Abschnitte vs. '+esc(def.label)+'</h3><p class="panel-sub">Grün = schneller als Benchmark, orange = langsamer.</p></div><div class="benchmark-tabs"><button class="benchmark-btn '+(state.benchmark==='median'?'active':'')+'" data-benchmark="median">Median</button><button class="benchmark-btn '+(state.benchmark==='top10'?'active':'')+'" data-benchmark="top10">Top 10 %</button><button class="benchmark-btn '+(state.benchmark==='winner'?'active':'')+'" data-benchmark="winner">Schnellste</button></div></div>'+renderBenchmarkBars(p)+'</div></div>'+renderSplitTable(p);
+    root.innerHTML=renderProfileHeader(p)+renderInsights(p)+'<div class="grid-2"><div class="panel card"><h3>Perzentil im Rennverlauf · Gesamtfeld</h3><p class="panel-sub">Je höher, desto weiter vorne im Feld. P90 entspricht ungefähr Top 10 %.</p><div class="chart-scroll"><div class="chart-host">'+renderPercentileChart(p)+'</div></div></div><div class="panel card"><div class="panel-head-row"><div><h3>Abschnitte vs. '+esc(def.label)+' · '+esc(groupLabel())+'</h3><p class="panel-sub">Grün = schneller als Benchmark, orange = langsamer.</p></div><div class="benchmark-tabs"><button class="benchmark-btn '+(state.benchmark==='median'?'active':'')+'" data-benchmark="median">Median</button><button class="benchmark-btn '+(state.benchmark==='top10'?'active':'')+'" data-benchmark="top10">Top 10 %</button><button class="benchmark-btn '+(state.benchmark==='winner'?'active':'')+'" data-benchmark="winner">Schnellste</button></div></div>'+renderBenchmarkBars(p)+'</div></div>'+renderSplitTable(p);
   }
 
   function compareCard(p,label){
     const pos=positionContext(p);const top=pos?fmtPct(topPct(pos.rank,pos.field)):'–';
-    return '<div class="compare-person card"><span class="section-kicker">'+label+' · '+esc(p.race)+'</span><h2>'+esc(p.displayName)+'</h2>'+statusBadge(p)+'<div class="compare-kpis"><div><span>Zielzeit</span><strong>'+(p.officialFinisher?fmtTime(p.finalSec):'–')+'</strong></div><div><span>Gesamtrang</span><strong>'+rankText(p.finishRankOverall,p.finishFieldOverall)+'</strong></div><div><span>Einordnung</span><strong>'+(pos?'Top '+top:'–')+'</strong></div><div><span>Letzter Punkt</span><strong>'+(lastSplit(p)?esc(lastSplit(p).checkpoint):'–')+'</strong></div></div></div>';
+    return '<div class="compare-person card"><span class="section-kicker">'+label+' · '+esc(p.race)+'</span><h2>'+esc(p.displayName)+'</h2>'+statusBadge(p)+'<div class="compare-kpis"><div><span>Zielzeit</span><strong>'+(p.officialFinisher?fmtTime(p.finalSec):'–')+'</strong></div><div><span>Gesamtrang</span><strong>'+rankText(p.finishRankOverall,p.finishFieldOverall)+'</strong></div><div><span>Einordnung · Gesamtfeld</span><strong>'+(pos?'Top '+top:'–')+'</strong></div><div><span>Letzter Punkt</span><strong>'+(lastSplit(p)?esc(lastSplit(p).checkpoint):'–')+'</strong></div></div></div>';
   }
 
   function renderDeltaChart(a,b,common){
@@ -163,15 +165,26 @@
 
   const pickerA=picker('#personAPicker','a'),pickerB=picker('#personBPicker','b');
 
-  function syncUrl(){const u=new URL(location.href);u.searchParams.set('mode',state.mode);if(state.race==='ALL')u.searchParams.delete('race');else u.searchParams.set('race',state.race);state.a?u.searchParams.set('a',state.a):u.searchParams.delete('a');state.b?u.searchParams.set('b',state.b):u.searchParams.delete('b');if(state.benchmark==='median')u.searchParams.delete('benchmark');else u.searchParams.set('benchmark',state.benchmark);history.replaceState(null,'',u);}
+  function syncUrl(){const u=new URL(location.href);u.searchParams.set('mode',state.mode);if(state.race==='ALL')u.searchParams.delete('race');else u.searchParams.set('race',state.race);state.a?u.searchParams.set('a',state.a):u.searchParams.delete('a');state.b?u.searchParams.set('b',state.b):u.searchParams.delete('b');if(state.benchmark==='median')u.searchParams.delete('benchmark');else u.searchParams.set('benchmark',state.benchmark);if(state.group==='all')u.searchParams.delete('group');else u.searchParams.set('group',state.group);history.replaceState(null,'',u);}
 
-  function render(){const compare=state.mode==='compare';$('#singleTab').classList.toggle('active',!compare);$('#compareTab').classList.toggle('active',compare);$('#singleTab').setAttribute('aria-selected',String(!compare));$('#compareTab').setAttribute('aria-selected',String(compare));$('#pickerGrid').classList.toggle('single-mode',!compare);$('#singleView').classList.toggle('hidden',compare);$('#compareView').classList.toggle('hidden',!compare);pickerA.set(state.a);pickerB.set(state.b);if(compare)renderCompare();else renderSingle();}
+  function render(){const compare=state.mode==='compare';$('#singleTab').classList.toggle('active',!compare);$('#compareTab').classList.toggle('active',compare);$('#singleTab').setAttribute('aria-selected',String(!compare));$('#compareTab').setAttribute('aria-selected',String(compare));$('#pickerGrid').classList.toggle('single-mode',!compare);$('#singleView').classList.toggle('hidden',compare);$('#compareView').classList.toggle('hidden',!compare);pickerA.set(state.a);pickerB.set(state.b);if(compare)renderCompare();else renderSingle();renderReferenceControls();document.dispatchEvent(new CustomEvent('bfutr:render'));}
 
+  function renderReferenceControls(){
+    $('#groupFilter').value=state.group;
+    $('#benchmarkFilter').value=state.benchmark;
+    const selected=[byId.get(state.a),state.mode==='compare'?byId.get(state.b):null].filter(Boolean);
+    const races=[...new Set(selected.map(p=>p.race))];
+    $('#referenceSummary').textContent=races.map(race=>{const stats=analytics.raceStats(race);return race+' · '+groupLabel()+' · '+stats.finish.count+' Finisher';}).join(' | ');
+  }
+
+  // Ein gemeinsamer Zustand hält Hauptansicht und Diagramme synchron.
+  analytics.viewState=()=>({...state});
   function init(){
     const races=Object.keys(DATA.raceMeta);$('#raceFilter').innerHTML='<option value="ALL">Alle Distanzen</option>'+races.map(r=>'<option value="'+esc(r)+'">'+esc(r)+'</option>').join('');$('#metricParticipants').textContent=DATA.participantCount.toLocaleString('de-DE');$('#metricRaces').textContent=races.length;$('#metricSplits').textContent=participants.reduce((n,p)=>n+p.splits.length,0).toLocaleString('de-DE');$('#dataNote').textContent=DATA.dataNote;
-    const params=new URLSearchParams(location.search);state.mode=params.get('mode')==='compare'?'compare':'single';state.race=races.includes(params.get('race'))?params.get('race'):'ALL';state.benchmark=benchmarkDefs[params.get('benchmark')]?params.get('benchmark'):'median';const fav=DATA.favorites.map(id=>byId.get(id)).filter(Boolean);state.a=byId.has(params.get('a'))?params.get('a'):(fav[0]&&fav[0].id);state.b=byId.has(params.get('b'))?params.get('b'):(fav[1]&&fav[1].id);$('#raceFilter').value=state.race;
+    const params=new URLSearchParams(location.search);analytics.setGroup(params.get('group'));state.group=analytics.getGroup();state.mode=params.get('mode')==='compare'?'compare':'single';state.race=races.includes(params.get('race'))?params.get('race'):'ALL';state.benchmark=Object.hasOwn(benchmarkDefs,params.get('benchmark'))?params.get('benchmark'):'median';const fav=DATA.favorites.map(id=>byId.get(id)).filter(Boolean);state.a=byId.has(params.get('a'))?params.get('a'):(fav[0]&&fav[0].id);state.b=byId.has(params.get('b'))?params.get('b'):(fav[1]&&fav[1].id);$('#raceFilter').value=state.race;
     $('#favoriteButtons').innerHTML=fav.map(p=>'<button type="button" data-id="'+p.id+'">'+esc(p.displayName)+'</button>').join('');$('#favoriteButtons').addEventListener('click',e=>{const btn=e.target.closest('[data-id]');if(!btn)return;if(state.mode==='compare'){if(!state.a||state.a===state.b)state.a=btn.dataset.id;else state.b=btn.dataset.id;}else state.a=btn.dataset.id;syncUrl();render();});
-    $('#raceFilter').addEventListener('change',e=>{state.race=e.target.value;if(state.race!=='ALL'){if(state.a&&byId.get(state.a).race!==state.race)state.a=null;if(state.b&&byId.get(state.b).race!==state.race)state.b=null;}syncUrl();render();});$('#singleTab').addEventListener('click',()=>{state.mode='single';syncUrl();render();});$('#compareTab').addEventListener('click',()=>{state.mode='compare';syncUrl();render();});$('#singleView').addEventListener('click',e=>{const btn=e.target.closest('[data-benchmark]');if(!btn)return;state.benchmark=btn.dataset.benchmark;syncUrl();renderSingle();});render();
+    $('#raceFilter').addEventListener('change',e=>{state.race=e.target.value;if(state.race!=='ALL'){if(state.a&&byId.get(state.a).race!==state.race)state.a=null;if(state.b&&byId.get(state.b).race!==state.race)state.b=null;}syncUrl();render();});$('#singleTab').addEventListener('click',()=>{state.mode='single';syncUrl();render();});$('#compareTab').addEventListener('click',()=>{state.mode='compare';syncUrl();render();});$('#groupFilter').addEventListener('change',e=>{analytics.setGroup(e.target.value);state.group=analytics.getGroup();syncUrl();render();});$('#benchmarkFilter').addEventListener('change',e=>{state.benchmark=e.target.value;syncUrl();render();});$('#singleView').addEventListener('click',e=>{const btn=e.target.closest('[data-benchmark]');if(!btn)return;state.benchmark=btn.dataset.benchmark;syncUrl();render();});render();
   }
   init();
 })();
+

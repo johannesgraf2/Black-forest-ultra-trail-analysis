@@ -4,7 +4,8 @@
   if(!DATA)return;
   const participants=DATA.participants||[];
   const byId=new Map(participants.map(p=>[p.id,p]));
-  const raceCache=new Map();
+  const analytics=window.BFUTR_ANALYTICS;
+  const groupLabel=()=>analytics.groupLabel();
   const $=sel=>document.querySelector(sel);
   const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const fmtTime=sec=>{if(sec==null||Number.isNaN(sec))return '–';let t=Math.round(sec*10);const d=t%10;t=Math.floor(t/10);const h=Math.floor(t/3600);const m=Math.floor((t%3600)/60);const s=t%60;return (h?h+':':'')+(h?String(m).padStart(2,'0'):m)+':'+String(s).padStart(2,'0')+','+d;};
@@ -14,76 +15,30 @@
   const percentile=(rank,field)=>rank&&field?(field-rank+1)/field*100:null;
   const pct=(value,reference)=>reference?((value/reference-1)*100):null;
 
-  function raceParticipants(race){
-    if(!raceCache.has(race))raceCache.set(race,participants.filter(p=>p.race===race));
-    return raceCache.get(race);
-  }
-
-  function quantile(values,q){
-    const a=values.filter(v=>v!=null&&Number.isFinite(v)).slice().sort((x,y)=>x-y);
-    if(!a.length)return null;
-    if(a.length===1)return a[0];
-    const pos=(a.length-1)*q;
-    const lo=Math.floor(pos),hi=Math.ceil(pos);
-    if(lo===hi)return a[lo];
-    return a[lo]+(a[hi]-a[lo])*(pos-lo);
-  }
+  const quantile=(values,q)=>analytics.quantile(values,q);
 
   function benchmarkDef(){
-    const active=document.querySelector('.benchmark-btn.active[data-benchmark]');
-    const key=active?active.dataset.benchmark:(new URLSearchParams(location.search).get('benchmark')||'median');
-    if(key==='top10')return {key:'top10',label:'Top 10 %',q:.10};
-    if(key==='winner')return {key:'winner',label:'Bestzeit',q:0};
-    return {key:'median',label:'Feldmedian',q:.50};
+    const key=analytics.viewState().benchmark;
+    const defs={median:{field:'medianSec',label:'Median'},top10:{field:'top10Sec',label:'Top 10 %'},winner:{field:'winnerSec',label:'Bestzeit'}};
+    const def=defs[key]||defs.median;
+    return {key,field:def.field,label:def.label+' · '+groupLabel()};
   }
 
   function checkpointBenchmark(race,checkpoint,def){
-    if(checkpoint==='Start')return 0;
-    const values=[];
-    raceParticipants(race).forEach(p=>{
-      const s=splitMap(p)[checkpoint];
-      if(s&&s.sec!=null)values.push(s.sec);
-    });
-    if(!values.length)return null;
-    if(def.key==='winner')return Math.min.apply(null,values);
-    return quantile(values,def.q);
+    const entry=analytics.raceStats(race).passage[checkpoint];
+    return entry?entry[def.field]:null;
   }
 
   function sectionBenchmark(race,from,to,def){
-    const entry=DATA.benchmarks&&DATA.benchmarks[race]&&DATA.benchmarks[race].section[from+' → '+to];
-    if(entry){
-      if(def.key==='top10'&&entry.top10Sec!=null)return entry.top10Sec;
-      if(def.key==='winner'&&entry.winnerSec!=null)return entry.winnerSec;
-      if(def.key==='median'&&entry.medianSec!=null)return entry.medianSec;
-    }
-    const values=[];
-    raceParticipants(race).forEach(p=>{
-      const m=splitMap(p);
-      if(m[from]&&m[to]){
-        const delta=m[to].sec-m[from].sec;
-        if(delta>=0)values.push(delta);
-      }
-    });
-    if(!values.length)return null;
-    if(def.key==='winner')return Math.min.apply(null,values);
-    return quantile(values,def.q);
-  }
-
-  function resolvePerson(param,inputSelector){
-    const id=new URLSearchParams(location.search).get(param);
-    if(id&&byId.has(id))return byId.get(id);
-    const input=$(inputSelector);
-    const name=input?input.value.trim():'';
-    if(!name)return null;
-    const race=$('#raceFilter')?$('#raceFilter').value:'ALL';
-    return participants.find(p=>p.displayName===name&&(race==='ALL'||p.race===race))||participants.find(p=>p.displayName===name)||null;
+    const entry=analytics.raceStats(race).section[from+' → '+to];
+    return entry?entry[def.field]:null;
   }
 
   function timeGapPoints(p,def){
     const m=splitMap(p),pts=[];
     raceOrder(p.race).forEach(cp=>{
       if(!m[cp])return;
-      if(cp==='Start'){pts.push({label:cp,value:0,ref:0,own:m[cp].sec});return;}
+      if(cp==='Start'){if(analytics.raceStats(p.race).passage.Start.count)pts.push({label:cp,value:0,ref:0,own:m[cp].sec});return;}
       const ref=checkpointBenchmark(p.race,cp,def);
       if(ref!=null)pts.push({label:cp,value:m[cp].sec-ref,ref,own:m[cp].sec});
     });
@@ -123,22 +78,24 @@
       const own=m[to].sec-m[from].sec;
       if(own<0)continue;
       const ref=sectionBenchmark(p.race,from,to,def);
-      if(ref==null)continue;
+      if(ref==null||ref<=0)continue;
       const diff=pct(own,ref);
       tiles.push({from,to,own,ref,diff});
     }
     if(!tiles.length)return '<div class="empty-state">Noch nicht genug Abschnitte für die Heatmap.</div>';
-    return '<div class="heatmap-grid">'+tiles.map(t=>'<div class="heat-tile '+heatClass(t.diff)+'"><span>'+esc(t.from)+' → '+esc(t.to)+'</span><strong>'+fmtTime(t.own)+'</strong><small>'+(t.diff>=0?'+':'')+t.diff.toFixed(1).replace('.',',')+' % vs. '+esc(def.label)+'</small></div>').join('')+'</div><div class="heat-legend"><span>schneller</span><div class="heat-scale"><i class="heat-fast-3"></i><i class="heat-fast-2"></i><i class="heat-fast-1"></i><i class="heat-slow-1"></i><i class="heat-slow-2"></i><i class="heat-slow-3"></i></div><span>langsamer</span></div>';
+    return '<div class="heatmap-grid">'+tiles.map(t=>'<div class="heat-tile '+heatClass(t.diff)+'"><span>'+esc(t.from)+' → '+esc(t.to)+'</span><strong>'+fmtTime(t.own)+'</strong><small>'+(t.diff>=0?'+':'')+t.diff.toFixed(1).replace('.',',')+' % vs. '+esc(def.label)+' · n = '+analytics.raceStats(p.race).section[t.from+' → '+t.to].count+'</small></div>').join('')+'</div><div class="heat-legend"><span>schneller</span><div class="heat-scale"><i class="heat-fast-3"></i><i class="heat-fast-2"></i><i class="heat-fast-1"></i><i class="heat-slow-1"></i><i class="heat-slow-2"></i><i class="heat-slow-3"></i></div><span>langsamer</span></div>';
   }
 
   function distributionData(race){
-    return raceParticipants(race).filter(p=>p.officialFinisher&&p.finalSec!=null).map(p=>p.finalSec).sort((a,b)=>a-b);
+    return analytics.raceStats(race).finishTimes;
   }
 
   function distributionChart(race,markers){
     const values=distributionData(race);
-    if(values.length<3)return '<div class="empty-state">Noch nicht genug Zielzeiten für eine Verteilung.</div>';
-    const min=values[0],max=values[values.length-1],median=quantile(values,.5),top10=quantile(values,.1);
+    if(values.length<3)return '<div class="empty-state">'+esc(groupLabel())+' · '+values.length+' gewertete Zielzeiten. Für eine Verteilung werden mindestens drei benötigt.'+(values.length?' Median: '+fmtTime(quantile(values,.5))+'.':'')+'</div>';
+    const validMarkers=(markers||[]).filter(x=>x.person&&x.person.officialFinisher&&Number.isFinite(x.person.finalSec));
+    const domain=values.concat(validMarkers.map(x=>x.person.finalSec));
+    const min=Math.min(...domain),max=Math.max(...domain),median=quantile(values,.5),top10=quantile(values,.1);
     const bins=Math.max(10,Math.min(18,Math.round(Math.sqrt(values.length))));
     const span=Math.max(1,max-min),step=span/bins,counts=Array(bins).fill(0);
     values.forEach(v=>{let i=Math.floor((v-min)/step);if(i>=bins)i=bins-1;if(i<0)i=0;counts[i]++;});
@@ -146,8 +103,8 @@
     const xVal=v=>pad.l+(v-min)/span*plotW;
     const barW=plotW/bins;
     const bars=counts.map((c,i)=>{const bh=maxCount?c/maxCount*(plotH-18):0;return '<rect x="'+(pad.l+i*barW+2)+'" y="'+(pad.t+plotH-bh)+'" width="'+Math.max(1,barW-4)+'" height="'+bh+'" rx="4" fill="#c9d7cb"/><text x="'+(pad.l+i*barW+barW/2)+'" y="'+(pad.t+plotH-bh-5)+'" text-anchor="middle" font-size="9" fill="#778178">'+(c?c:'')+'</text>';}).join('');
-    const markerHtml=(markers||[]).filter(x=>x.person&&x.person.officialFinisher&&x.person.finalSec!=null).map((x,i)=>{const xx=xVal(x.person.finalSec),anchor=xx>w-150?'end':'start',dx=anchor==='end'?-7:7;return '<line x1="'+xx+'" y1="'+(pad.t-4)+'" x2="'+xx+'" y2="'+(pad.t+plotH)+'" stroke="'+x.color+'" stroke-width="3"/><text x="'+(xx+dx)+'" y="'+(pad.t+12+i*16)+'" text-anchor="'+anchor+'" font-size="10.5" font-weight="800" fill="'+x.color+'">'+esc(x.person.displayName)+' · '+fmtTime(x.person.finalSec)+'</text>';}).join('');
-    return '<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="Verteilung der Zielzeiten"><line x1="'+pad.l+'" y1="'+(pad.t+plotH)+'" x2="'+(w-pad.r)+'" y2="'+(pad.t+plotH)+'" stroke="#b7c1b8"/>'+bars+'<line x1="'+xVal(median)+'" y1="'+pad.t+'" x2="'+xVal(median)+'" y2="'+(pad.t+plotH)+'" stroke="#657066" stroke-width="2" stroke-dasharray="5 4"/><text x="'+xVal(median)+'" y="'+(pad.t+plotH+20)+'" text-anchor="middle" font-size="10" fill="#657066">Median '+fmtTime(median)+'</text><line x1="'+xVal(top10)+'" y1="'+pad.t+'" x2="'+xVal(top10)+'" y2="'+(pad.t+plotH)+'" stroke="#2f6b4d" stroke-width="1.5" stroke-dasharray="3 4"/><text x="'+xVal(top10)+'" y="'+(pad.t+plotH+36)+'" text-anchor="middle" font-size="10" fill="#2f6b4d">Top 10 % '+fmtTime(top10)+'</text><text x="'+pad.l+'" y="'+(h-8)+'" text-anchor="start" font-size="10" fill="#657066">'+fmtTime(min)+'</text><text x="'+(w-pad.r)+'" y="'+(h-8)+'" text-anchor="end" font-size="10" fill="#657066">'+fmtTime(max)+'</text>'+markerHtml+'</svg><div class="distribution-meta"><span><strong>'+values.length+'</strong> Finisher</span><span><strong>'+fmtTime(median)+'</strong> Median</span><span><strong>'+fmtTime(top10)+'</strong> Top-10-%-Grenze</span></div>';
+    const markerHtml=validMarkers.map((x,i)=>{const xx=xVal(x.person.finalSec),anchor=xx>w-150?'end':'start',dx=anchor==='end'?-7:7;return '<line x1="'+xx+'" y1="'+(pad.t-4)+'" x2="'+xx+'" y2="'+(pad.t+plotH)+'" stroke="'+x.color+'" stroke-width="3"/><text x="'+(xx+dx)+'" y="'+(pad.t+12+i*16)+'" text-anchor="'+anchor+'" font-size="10.5" font-weight="800" fill="'+x.color+'">'+esc(x.person.displayName)+(analytics.getGroup()!=='all'&&x.person.gender!==groupLabel()?' (Vergleich)':'')+' · '+fmtTime(x.person.finalSec)+'</text>';}).join('');
+    return '<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="Verteilung der Zielzeiten"><line x1="'+pad.l+'" y1="'+(pad.t+plotH)+'" x2="'+(w-pad.r)+'" y2="'+(pad.t+plotH)+'" stroke="#b7c1b8"/>'+bars+'<line x1="'+xVal(median)+'" y1="'+pad.t+'" x2="'+xVal(median)+'" y2="'+(pad.t+plotH)+'" stroke="#657066" stroke-width="2" stroke-dasharray="5 4"/><text x="'+xVal(median)+'" y="'+(pad.t+plotH+20)+'" text-anchor="middle" font-size="10" fill="#657066">Median '+fmtTime(median)+'</text><line x1="'+xVal(top10)+'" y1="'+pad.t+'" x2="'+xVal(top10)+'" y2="'+(pad.t+plotH)+'" stroke="#2f6b4d" stroke-width="1.5" stroke-dasharray="3 4"/><text x="'+xVal(top10)+'" y="'+(pad.t+plotH+36)+'" text-anchor="middle" font-size="10" fill="#2f6b4d">Top 10 % '+fmtTime(top10)+'</text><text x="'+pad.l+'" y="'+(h-8)+'" text-anchor="start" font-size="10" fill="#657066">'+fmtTime(min)+'</text><text x="'+(w-pad.r)+'" y="'+(h-8)+'" text-anchor="end" font-size="10" fill="#657066">'+fmtTime(max)+'</text>'+markerHtml+'</svg><div class="distribution-meta"><span>'+esc(groupLabel())+' · <strong>'+values.length+'</strong> Finisher</span><span><strong>'+fmtTime(median)+'</strong> Median</span><span><strong>'+fmtTime(top10)+'</strong> Top-10-%-Grenze</span></div>';
   }
 
   function comparePercentileChart(a,b){
@@ -165,38 +122,31 @@
 
   function singleEnhancement(p){
     const def=benchmarkDef();
-    return '<div id="v3-single-visuals" class="v3-visuals"><div class="visual-grid"><div class="panel card visual-card"><div class="visual-title"><div><span class="section-kicker">Zeitverlauf</span><h3>Abstand zum '+esc(def.label)+'</h3><p class="panel-sub">Kumulativer Zeitabstand an jedem Messpunkt. Unter der Nulllinie bedeutet schneller als die Referenz.</p></div></div><div class="chart-scroll"><div class="chart-host">'+gapChart(p)+'</div></div></div><div class="panel card visual-card"><div class="visual-title"><div><span class="section-kicker">Feldvergleich</span><h3>Zielzeit-Verteilung · '+esc(p.race)+'</h3><p class="panel-sub">Wo die Zielzeit innerhalb aller offiziellen Finisher dieser Distanz liegt.</p></div></div><div class="chart-scroll"><div class="chart-host">'+distributionChart(p.race,[{person:p,color:'#173d2d'}])+'</div></div>'+(p.officialFinisher?'':'<div class="notice compact">Kein offizielles Zielresultat: Die Feldverteilung bleibt sichtbar, aber es wird keine persönliche Zielmarke eingezeichnet.</div>')+'</div></div><div class="panel card visual-card heat-card"><div class="visual-title"><div><span class="section-kicker">Abschnittsprofil</span><h3>Section Heatmap · vs. '+esc(def.label)+'</h3><p class="panel-sub">Jede Kachel zeigt sofort, welche Abschnitte relativ zur gewählten Referenz besonders stark oder schwach waren.</p></div></div>'+heatmap(p)+'</div></div>';
+    return '<div id="v3-single-visuals" class="v3-visuals"><div class="visual-grid"><div class="panel card visual-card"><div class="visual-title"><div><span class="section-kicker">Zeitverlauf</span><h3>Zeitabstand · '+esc(def.label)+'</h3><p class="panel-sub">Kumulativer Zeitabstand an jedem Messpunkt. Unter der Nulllinie bedeutet schneller als die Referenz.</p></div></div><div class="chart-scroll"><div class="chart-host">'+gapChart(p)+'</div></div></div><div class="panel card visual-card"><div class="visual-title"><div><span class="section-kicker">Feldvergleich</span><h3>Zielzeit-Verteilung · '+esc(p.race)+'</h3><p class="panel-sub">Vergleichsgruppe: '+esc(groupLabel())+'. Nur gewertete Finisher dieser Distanz. Persönliche Markierungen dienen zum Vergleich und ändern die Verteilung nicht.</p></div></div><div class="chart-scroll"><div class="chart-host">'+distributionChart(p.race,[{person:p,color:'#173d2d'}])+'</div></div>'+(p.officialFinisher?'':'<div class="notice compact">Kein offizielles Zielresultat: Die Feldverteilung bleibt sichtbar, aber es wird keine persönliche Zielmarke eingezeichnet.</div>')+'</div></div><div class="panel card visual-card heat-card"><div class="visual-title"><div><span class="section-kicker">Abschnittsprofil</span><h3>Section Heatmap · vs. '+esc(def.label)+'</h3><p class="panel-sub">Jede Kachel zeigt sofort, welche Abschnitte relativ zur gewählten Referenz besonders stark oder schwach waren.</p></div></div>'+heatmap(p)+'</div></div>';
   }
 
   function compareEnhancement(a,b){
     let distribution='';
     if(a.race===b.race){
-      distribution='<div class="panel card visual-card"><span class="section-kicker">Feldvergleich</span><h3>Beide Zielzeiten im Feld</h3><p class="panel-sub">Gemeinsame Verteilung für '+esc(a.race)+'.</p><div class="chart-scroll"><div class="chart-host">'+distributionChart(a.race,[{person:a,color:'#173d2d'},{person:b,color:'#d96c43'}])+'</div></div></div>';
+      distribution='<div class="panel card visual-card"><span class="section-kicker">Feldvergleich</span><h3>Zielzeiten im Vergleichsfeld</h3><p class="panel-sub">'+esc(a.race)+' · '+esc(groupLabel())+' · gewertete Finisher.</p><div class="chart-scroll"><div class="chart-host">'+distributionChart(a.race,[{person:a,color:'#173d2d'},{person:b,color:'#d96c43'}])+'</div></div></div>';
     }else{
       distribution='<div class="visual-grid"><div class="panel card visual-card"><span class="section-kicker">'+esc(a.race)+'</span><h3>'+esc(a.displayName)+' im Feld</h3><div class="chart-scroll"><div class="chart-host">'+distributionChart(a.race,[{person:a,color:'#173d2d'}])+'</div></div></div><div class="panel card visual-card"><span class="section-kicker">'+esc(b.race)+'</span><h3>'+esc(b.displayName)+' im Feld</h3><div class="chart-scroll"><div class="chart-host">'+distributionChart(b.race,[{person:b,color:'#d96c43'}])+'</div></div></div></div>';
     }
-    return '<div id="v3-compare-visuals" class="v3-visuals"><div class="panel card visual-card"><span class="section-kicker">Relative Position</span><h3>Perzentil-Verlauf im direkten Vergleich</h3><p class="panel-sub">Die Kurven vergleichen die Position im jeweiligen Feld, nicht nur die absolute Zeit.</p><div class="chart-scroll"><div class="chart-host">'+comparePercentileChart(a,b)+'</div></div></div>'+distribution+'<div class="visual-grid"><div class="panel card visual-card heat-card"><span class="section-kicker">'+esc(a.displayName)+'</span><h3>Section Heatmap</h3>'+heatmap(a)+'</div><div class="panel card visual-card heat-card"><span class="section-kicker">'+esc(b.displayName)+'</span><h3>Section Heatmap</h3>'+heatmap(b)+'</div></div></div>';
+    return '<div id="v3-compare-visuals" class="v3-visuals"><div class="panel card visual-card"><span class="section-kicker">Relative Position</span><h3>Perzentil-Verlauf · Gesamtfeld</h3><p class="panel-sub">Die Kurven zeigen die Position im Gesamtfeld der jeweiligen Distanz.</p><div class="chart-scroll"><div class="chart-host">'+comparePercentileChart(a,b)+'</div></div></div>'+distribution+'<div class="visual-grid"><div class="panel card visual-card heat-card"><span class="section-kicker">'+esc(a.displayName)+'</span><h3>Section Heatmap · '+esc(benchmarkDef().label)+'</h3>'+heatmap(a)+'</div><div class="panel card visual-card heat-card"><span class="section-kicker">'+esc(b.displayName)+'</span><h3>Section Heatmap · '+esc(benchmarkDef().label)+'</h3>'+heatmap(b)+'</div></div></div>';
   }
 
   function enhance(){
     const single=$('#singleView'),compare=$('#compareView');
     if(single&&!single.classList.contains('hidden')&&!$('#v3-single-visuals')){
-      const p=resolvePerson('a','#personAInput');
+      const p=byId.get(analytics.viewState().a);
       if(p){const target=single.querySelector('.table-card');if(target)target.insertAdjacentHTML('beforebegin',singleEnhancement(p));else single.insertAdjacentHTML('beforeend',singleEnhancement(p));}
     }
     if(compare&&!compare.classList.contains('hidden')&&!$('#v3-compare-visuals')){
-      const a=resolvePerson('a','#personAInput'),b=resolvePerson('b','#personBInput');
+      const a=byId.get(analytics.viewState().a),b=byId.get(analytics.viewState().b);
       if(a&&b){const target=compare.querySelector('.table-card');if(target)target.insertAdjacentHTML('beforebegin',compareEnhancement(a,b));else compare.insertAdjacentHTML('beforeend',compareEnhancement(a,b));}
     }
   }
 
-  let queued=false;
-  const observer=new MutationObserver(()=>{
-    if(queued)return;
-    queued=true;
-    requestAnimationFrame(()=>{queued=false;enhance();});
-  });
-  observer.observe(document.body,{childList:true,subtree:true});
-  window.addEventListener('popstate',()=>setTimeout(enhance,0));
+  document.addEventListener('bfutr:render',enhance);
   enhance();
 })();

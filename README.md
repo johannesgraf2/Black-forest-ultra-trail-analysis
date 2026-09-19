@@ -1,6 +1,28 @@
-# BFUTR 2026 Race Analytics
+# BFUTR 2026 Race Analytics · v4
 
 Statische GitHub-Pages-Seite für die Analyse der BFUTR-2026-Zwischenzeiten. Kein Server und keine Datenbank nötig.
+
+## Version 4 · Vergleichsgruppen
+
+- Die Karte „Einordnung · Ziel“ zeigt nur noch **Top x %**, ohne zusätzlichen Perzentilwert.
+- **Vergleichsgruppe: Alle / Männer / Frauen** und **Referenz: Median / Top 10 % / Schnellste Zeit** stehen oben in beiden Analysemodi bereit.
+- Die Gruppe steuert Abschnittsbalken, Heatmaps, Zeitabstand zur Referenz, Zielzeitverteilung, Medianwerte in der Tabelle sowie stärksten/schwächsten Abschnitt und Pacing-Konstanz.
+- Die Auswahl wird im Link gespeichert (`group=men`, `group=women`; ohne Parameter: Alle).
+- Die Zielzeitverteilung zeigt die Anzahl der gewerteten Finisher der Gruppe. Einzelne Vergleichspersonen können außerhalb dieser Gruppe liegen; ihre Markierungen verändern die Statistik nicht.
+
+**Einordnung und Rang:** Gesamtrang, Top-% und Perzentilkurven beziehen sich weiterhin auf das Gesamtfeld der jeweiligen Distanz und sind entsprechend beschriftet. Der separat ausgewiesene Geschlechtsrang bezieht sich auf die Kategorie der Person. Die neue Auswahl bestimmt die Leistungsreferenzen, keine neue offizielle Rangliste.
+
+**Datenbasis:** Verwendet wird die Geschlechtskategorie aus dem Export. „Alle“ enthält auch weitere oder offene Kategorien. Für jeden Abschnitt werden nur Personen mit beiden gültigen Messungen einbezogen; fehlende Daten werden nicht als null Sekunden behandelt. Ungewertete Personen wie Peter bleiben bis zum letzten gültigen Zwischenpunkt enthalten. Zielreferenzen und Zielzeitverteilungen verwenden nur gewertete Finisher. Die Referenzpopulation kann deshalb je Messpunkt unterschiedlich groß sein. Median, Top-10-%-Grenze und Bestzeit werden direkt aus den Einzelmessungen der gewählten Gruppe berechnet; die Top-10-%-Grenze ist ein linear interpoliertes 10. Perzentil.
+
+### Diese Version hochladen
+
+ZIP entpacken und den Inhalt des Projektordners in das bestehende Repository hochladen. Insbesondere müssen `index.html`, `app.js`, `v3.js`, `style.css` und die neue **`analytics.js`** zusammen aktualisiert werden. Danach wie bisher committen; die Pages-Adresse bleibt gleich. Die Datei `v3.js` enthält aus Kompatibilitätsgründen auch in v4 die zusätzlichen Diagramme.
+
+Zum lokalen Öffnen genügt `index.html`; alle Berechnungen laufen im Browser. Alternativ im Projektordner `python3 -m http.server 8000` starten und `http://localhost:8000` öffnen.
+
+### Prüfung
+
+`node tests/analytics.test.cjs` prüft alle fünf Distanzen und drei Gruppen gegen unabhängig berechnete Referenzwerte sowie fehlende Daten und ungewertete Zielmessungen. Die JavaScript-Ansichten und Filterwechsel wurden zusätzlich mit einem DOM-Testmodell geprüft. Eine visuelle Browserprüfung war in der Erstellungsumgebung nicht verfügbar.
 
 ## Neue Analysefunktionen
 
@@ -44,3 +66,4 @@ Die v3 ergänzt vier visuelle Analysebausteine:
 - Zielzeit-Histogramm mit Median, Top-10-%-Grenze und persönlicher Markierung
 
 Die Visualisierungen sind weiterhin vollständig statisch und benötigen keine externe Chart-Bibliothek.
+

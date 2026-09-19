@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Analyse der Ergebnisse und Zwischenzeiten des Black Forest Ultra Trail 2026.">
   <title>BFUTR 2026 · Race Analytics</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
   <div class="page-shell">
@@ -49,6 +49,12 @@
             </div>
           </div>
         </div>
+        <div class="reference-controls">
+          <label for="groupFilter"><span>Vergleichsgruppe</span><select id="groupFilter" aria-describedby="referenceHelp"><option value="all">Alle</option><option value="men">Männer</option><option value="women">Frauen</option></select></label>
+          <label for="benchmarkFilter"><span>Referenz</span><select id="benchmarkFilter"><option value="median">Median</option><option value="top10">Top 10 %</option><option value="winner">Schnellste Zeit</option></select></label>
+          <p id="referenceSummary" class="reference-summary" role="status" aria-live="polite"></p>
+        </div>
+        <p id="referenceHelp" class="reference-help">Die Gruppe bestimmt die Referenzwerte, Abschnittsanalysen und Zielzeitverteilung. Gesamtrang, Top-% und Perzentilkurven beziehen sich auf das Gesamtfeld der jeweiligen Distanz.</p>
       </section>
 
       <section id="singleView" class="analysis-view"></section>
@@ -59,8 +65,8 @@
         <div class="method-grid">
           <p><strong>Zielzeit</strong> kommt ausschließlich aus einer tatsächlich gemessenen Passage am Messpunkt „Ziel“. Datasport-Prognosen werden nicht als Ergebnis gewertet.</p>
           <p><strong>Top-% und Perzentil</strong> basieren auf dem Rang unter allen Personen mit einer echten Messung am jeweiligen Checkpoint. Ein Perzentil von 93 bedeutet, dass die Zeit besser als ungefähr 93 % des Feldes war.</p>
-          <p><strong>Abschnitts-Benchmarks</strong> sind Median, 10.-Perzentil-Zeit als Top-10-%-Niveau und die schnellste gemessene Abschnittszeit der Distanz.</p>
-          <p><strong>Pacing-Konstanz</strong> misst die Streuung der eigenen Abschnittsleistung relativ zum Feldmedian. 100 bedeutet sehr gleichmäßig; pro Prozentpunkt Standardabweichung werden zwei Punkte abgezogen.</p>
+          <p><strong>Abschnitts-Benchmarks</strong> sind Median, 10.-Perzentil-Zeit als Top-10-%-Niveau und die schnellste gemessene Abschnittszeit der gewählten Vergleichsgruppe und Distanz. Jeder Abschnitt nutzt nur Personen mit beiden Messungen. „Alle“ umfasst sämtliche Geschlechtskategorien aus dem Export.</p>
+          <p><strong>Pacing-Konstanz</strong> misst die Streuung der eigenen Abschnittsleistung relativ zum Median der gewählten Vergleichsgruppe. 100 bedeutet sehr gleichmäßig; pro Prozentpunkt Standardabweichung werden zwei Punkte abgezogen.</p>
         </div>
       </section>
     </main>
@@ -68,7 +74,9 @@
     <footer><p>BFUTR 2026 Race Analytics · statische GitHub-Pages-Auswertung</p><p id="dataNote"></p></footer>
   </div>
   <script src="data.js"></script>
-  <script src="app.js"></script>
-  <script src="v3.js"></script>
+  <script src="analytics.js?v=4"></script>
+  <script src="app.js?v=4"></script>
+  <script src="v3.js?v=4"></script>
 </body>
 </html>
+
