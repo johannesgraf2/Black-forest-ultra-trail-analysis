@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-"""Build data.js for the static BFUTR analysis website.
+"""Prepare static BFUTR 2026 analytics data for GitHub Pages.
 
 Usage:
     python3 scripts/prepare_data.py /path/to/bfutr_2026_zwischenzeiten_long.csv
 
-The script uses only the Python standard library. It deliberately trusts the measured
-"Ziel" split for the finish time instead of the CSV's "Zielzeit" field, because Datasport
-special classifications (for example Bergpreis) can populate "Zielzeit" with a different
-result. Non-numeric prediction objects are ignored as measurements.
+Only the Python standard library is required.
 """
 
 import csv
@@ -114,6 +111,22 @@ def median_or_none(values):
     return round(statistics.median(cleaned), 1)
 
 
+def quantile_or_none(values, q):
+    cleaned = sorted(value for value in values if value is not None)
+    if not cleaned:
+        return None
+    if len(cleaned) == 1:
+        return round(cleaned[0], 1)
+    position = (len(cleaned) - 1) * q
+    lower = int(math.floor(position))
+    upper = int(math.ceil(position))
+    if lower == upper:
+        return round(cleaned[lower], 1)
+    fraction = position - lower
+    value = cleaned[lower] + (cleaned[upper] - cleaned[lower]) * fraction
+    return round(value, 1)
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python3 scripts/prepare_data.py /path/to/bfutr_2026_zwischenzeiten_long.csv")
@@ -169,7 +182,6 @@ def main():
 
     participants = [participants_by_key[key] for key in row_order]
 
-    # Complete search aliases and normalized status/final time.
     for item in participants:
         split_map = {split["checkpoint"]: split for split in item["splits"]}
         finish_split = split_map.get("Ziel")
@@ -190,7 +202,6 @@ def main():
     for item in participants:
         by_race[item["race"]].append(item)
 
-    # Final ranks are derived from measured finish splits, never from potentially special source lists.
     for race, group in by_race.items():
         finishers = [item for item in group if item["officialFinisher"]]
         overall_times = [item["finalSec"] for item in finishers]
@@ -210,7 +221,6 @@ def main():
                 item["finishRankGender"] = None
                 item["finishFieldGender"] = len(gender_times[item["gender"]])
 
-    # Split ranks include anyone with a real measurement, including athletes without a finish result.
     for race, group in by_race.items():
         checkpoint_values = defaultdict(list)
         checkpoint_gender_values = defaultdict(lambda: defaultdict(list))
@@ -237,7 +247,6 @@ def main():
                 split["rankGender"] = competition_rank(gender_values, split["sec"])
                 split["fieldGender"] = len(gender_values)
 
-    # Benchmarks for section analysis.
     benchmarks = {}
     race_orders = {}
     for race, group in by_race.items():
@@ -277,6 +286,8 @@ def main():
             key = previous + " → " + current
             section[key] = {
                 "medianSec": median_or_none(values),
+                "top10Sec": quantile_or_none(values, 0.10),
+                "winnerSec": round(min(values), 1) if values else None,
                 "count": len(values),
             }
 

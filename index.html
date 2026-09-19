@@ -13,7 +13,7 @@
       <div class="hero-copy">
         <p class="eyebrow">BLACK FOREST ULTRA TRAIL · 2026</p>
         <h1>Race Analytics</h1>
-        <p class="hero-text">Zwischenzeiten verstehen, Rennverläufe vergleichen und sehen, auf welchen Abschnitten Zeit gewonnen oder verloren wurde.</p>
+        <p class="hero-text">Zwischenzeiten verstehen, Rennverläufe vergleichen und sehen, auf welchen Abschnitten Zeit und Plätze gewonnen oder verloren wurden.</p>
       </div>
       <div class="hero-metrics" aria-label="Datensatz Übersicht">
         <div><strong id="metricParticipants">–</strong><span>Teilnehmer</span></div>
@@ -25,26 +25,14 @@
     <main>
       <section class="control-panel card" aria-label="Analyse auswählen">
         <div class="control-topline">
-          <div>
-            <span class="section-kicker">Analyse</span>
-            <h2>Wen möchtest du ansehen?</h2>
-          </div>
-          <label class="race-filter">
-            <span>Distanz</span>
-            <select id="raceFilter" aria-label="Distanz filtern"></select>
-          </label>
+          <div><span class="section-kicker">Analyse</span><h2>Wen möchtest du ansehen?</h2></div>
+          <label class="race-filter"><span>Distanz</span><select id="raceFilter" aria-label="Distanz filtern"></select></label>
         </div>
-
         <div class="mode-tabs" role="tablist" aria-label="Analysemodus">
           <button id="singleTab" class="mode-tab active" type="button" role="tab" aria-selected="true">Einzelanalyse</button>
           <button id="compareTab" class="mode-tab" type="button" role="tab" aria-selected="false">Zwei Personen vergleichen</button>
         </div>
-
-        <div class="quick-area">
-          <span>Direktauswahl</span>
-          <div id="favoriteButtons" class="quick-buttons"></div>
-        </div>
-
+        <div class="quick-area"><span>Direktauswahl</span><div id="favoriteButtons" class="quick-buttons"></div></div>
         <div id="pickerGrid" class="picker-grid single-mode">
           <div class="picker-block">
             <label for="personAInput">Person A</label>
@@ -67,24 +55,18 @@
       <section id="compareView" class="analysis-view hidden"></section>
 
       <section class="method-card card">
-        <div>
-          <span class="section-kicker">Zur Einordnung</span>
-          <h2>So werden die Werte berechnet</h2>
-        </div>
+        <div><span class="section-kicker">Zur Einordnung</span><h2>So werden die Werte berechnet</h2></div>
         <div class="method-grid">
           <p><strong>Zielzeit</strong> kommt ausschließlich aus einer tatsächlich gemessenen Passage am Messpunkt „Ziel“. Datasport-Prognosen werden nicht als Ergebnis gewertet.</p>
-          <p><strong>Checkpoint-Ränge</strong> werden aus allen Personen mit einer echten Messung an diesem Punkt berechnet. Dadurch bleiben auch Läufer ohne Zielresultat bis zu ihrem letzten Messpunkt vergleichbar.</p>
-          <p><strong>Abschnitt vs. Median</strong> vergleicht die Abschnittszeit mit dem Median aller verfügbaren Zeiten derselben Distanz für genau diesen Abschnitt.</p>
+          <p><strong>Top-% und Perzentil</strong> basieren auf dem Rang unter allen Personen mit einer echten Messung am jeweiligen Checkpoint. Ein Perzentil von 93 bedeutet, dass die Zeit besser als ungefähr 93 % des Feldes war.</p>
+          <p><strong>Abschnitts-Benchmarks</strong> sind Median, 10.-Perzentil-Zeit als Top-10-%-Niveau und die schnellste gemessene Abschnittszeit der Distanz.</p>
+          <p><strong>Pacing-Konstanz</strong> misst die Streuung der eigenen Abschnittsleistung relativ zum Feldmedian. 100 bedeutet sehr gleichmäßig; pro Prozentpunkt Standardabweichung werden zwei Punkte abgezogen.</p>
         </div>
       </section>
     </main>
 
-    <footer>
-      <p>BFUTR 2026 Race Analytics · statische GitHub-Pages-Auswertung</p>
-      <p id="dataNote"></p>
-    </footer>
+    <footer><p>BFUTR 2026 Race Analytics · statische GitHub-Pages-Auswertung</p><p id="dataNote"></p></footer>
   </div>
-
   <script src="data.js"></script>
   <script src="app.js"></script>
 </body>
